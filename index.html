@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1e1e1e; /* Dark theme background */
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .admin-panel {
+            margin: 20px;
+        }
+
+        .admin-panel input, .admin-panel button {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .admin-panel input[type="text"] {
+            width: 300px;
+            padding: 10px;
+        }
+
+        .admin-panel button {
+            padding: 10px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .admin-panel button:hover {
+            background-color: #0056b3;
+        }
+
+        #message {
+            color: #dc3545;
+            margin-top: 10px;
+        }
+        
+
+        table {
+            width:100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            
+        }
+
+        table, th, td {
+            border: 1px solid #3a3a3a;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        td img {
+            max-width: 100px;
+        }
+
+        .action-buttons button {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Admin Panel -->
+    <div class="admin-panel">
+        <h2>Admin Panel</h2>
+        <input type="text" id="imageURL" placeholder="Image URL">
+        <input type="text" id="title" placeholder="Slide Title">
+        <input type="text" id="link" placeholder="Movie Link">
+        <button id="addSlide">Add Slide</button>
+        <div id="message"></div>
+
+        <!-- Table to display slides -->
+       
+        <table>
+            <thead>
+                <tr>
+                    <th>Image</th>
+                    <th>Title</th>
+                    <th>Link</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="slidesContainer">
+                <!-- Slide rows will be added here dynamically -->
+            </tbody>
+        </table>
+       
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getDatabase, ref, set, get, update, remove } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBsz-82MDaibWnIBUpoykrZHyJW7UMedX8",
+            authDomain: "movies-bee24.firebaseapp.com",
+            databaseURL: "https://movies-bee24-default-rtdb.firebaseio.com",
+            projectId: "movies-bee24",
+            storageBucket: "movies-bee24.appspot.com",
+            messagingSenderId: "1080659811750",
+            appId: "1:1080659811750:web:c1ef7d4dacc3ab17edc367"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const slidesRef = ref(db, 'slides');
+        const addSlideButton = document.getElementById('addSlide');
+        const messageDiv = document.getElementById('message');
+        const slidesContainer = document.getElementById('slidesContainer');
+
+        // Function to add new slide
+        function addSlide() {
+            const imageURL = document.getElementById('imageURL').value;
+            const title = document.getElementById('title').value;
+            const link = document.getElementById('link').value;
+
+            if (imageURL && title && link) {
+                const newSlideRef = ref(db, `slides/${Date.now()}`);
+                set(newSlideRef, {
+                    imageURL: imageURL,
+                    title: title,
+                    link: link
+                })
+                .then(() => {
+                    document.getElementById('imageURL').value = '';
+                    document.getElementById('title').value = '';
+                    document.getElementById('link').value = '';
+                    messageDiv.innerText = 'Slide added successfully!';
+                    loadSlides(); // Reload slides after adding
+                })
+                .catch((error) => {
+                    messageDiv.innerText = 'Failed to add slide: ' + error.message;
+                });
+            } else {
+                messageDiv.innerText = 'Please fill in all fields.';
+            }
+        }
+
+        // Load Slides into table
+        function loadSlides() {
+            slidesContainer.innerHTML = ''; // Clear the table body before loading
+            get(slidesRef).then((snapshot) => {
+                if (snapshot.exists()) {
+                    const slides = snapshot.val();
+                    for (const id in slides) {
+                        const slide = slides[id];
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td><img src="${slide.imageURL}" alt="${slide.title}"></td>
+                            <td>${slide.title}</td>
+                            <td><a href="${slide.link}" target="_blank">Watch Now</a></td>
+                            <td class="action-buttons">
+                                <button onclick="editSlide('${id}', '${slide.imageURL}', '${slide.title}', '${slide.link}')">Edit</button>
+                                <button onclick="deleteSlide('${id}')">Delete</button>
+                            </td>
+                        `;
+                        slidesContainer.appendChild(row);
+                    }
+                }
+            });
+        }
+
+        // Edit Slide
+        window.editSlide = (id, imageURL, title, link) => {
+            document.getElementById('imageURL').value = imageURL;
+            document.getElementById('title').value = title;
+            document.getElementById('link').value = link;
+
+            addSlideButton.textContent = 'Update Slide';
+            addSlideButton.onclick = () => {
+                const updatedImageURL = document.getElementById('imageURL').value;
+                const updatedTitle = document.getElementById('title').value;
+                const updatedLink = document.getElementById('link').value;
+
+                if (updatedImageURL && updatedTitle && updatedLink) {
+                    update(ref(db, `slides/${id}`), {
+                        imageURL: updatedImageURL,
+                        title: updatedTitle,
+                        link: updatedLink
+                    })
+                    .then(() => {
+                        messageDiv.innerText = 'Slide updated successfully!';
+                        addSlideButton.textContent = 'Add Slide';
+                        addSlideButton.onclick = addSlide;
+                        loadSlides(); // Reload slides after updating
+                    })
+                    .catch((error) => {
+                        messageDiv.innerText = 'Failed to update slide: ' + error.message;
+                    });
+                } else {
+                    messageDiv.innerText = 'Please fill in all fields.';
+                }
+            };
+        };
+
+        // Delete Slide
+        window.deleteSlide = (id) => {
+            remove(ref(db, `slides/${id}`))
+            .then(() => {
+                messageDiv.innerText = 'Slide deleted successfully!';
+                loadSlides(); // Reload slides after deleting
+            })
+            .catch((error) => {
+                messageDiv.innerText = 'Failed to delete slide: ' + error.message;
+            });
+        };
+
+        // Load slides on page load
+        loadSlides();
+    </script>
+</body>
+</html>
